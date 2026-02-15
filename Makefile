@@ -10,4 +10,4 @@ run:
 	java -jar runelite-client/build/libs/client-*-shaded.jar
 
 server:
-	cd python && uv run agent_server.py
+	cd python && uv run agent-serve

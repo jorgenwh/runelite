@@ -1,8 +1,11 @@
 [project]
-name = "python"
+name = "runelite-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Python agent framework for the RuneLite Agent Controller plugin"
 requires-python = ">=3.12"
 dependencies = [
     "websockets>=16.0",
 ]
+
+[project.scripts]
+agent-serve = "agent.__main__:main"

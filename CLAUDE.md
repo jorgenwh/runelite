@@ -76,6 +76,31 @@ The EventBus dispatches events from `net.runelite.api.events`. Common events:
 
 Overlays in `client/ui/overlay/` render on top of the game. Extend `Overlay` or `OverlayPanel` and register via `OverlayManager`.
 
+### Agent Controller Plugin
+
+The `agentcontroller` plugin (`runelite-client/src/main/java/.../plugins/agentcontroller/`) provides a WebSocket bridge for external agent control:
+
+- **AgentControllerPlugin.java** - Main plugin, sends observations and receives actions each GameTick
+- **AgentWebSocket.java** - OkHttp WebSocket client connecting to `ws://localhost:8765`
+- **ActionHandler.java** - Deserializes JSON actions and executes them (currently supports `toggle_prayer`)
+- **PrayerMap.java** - Maps prayer names to Prayer API objects and widget IDs
+- **AgentControllerConfig.java** - Config with `active` toggle
+
+**Protocol** (JSON over WebSocket):
+- Plugin sends observations each tick: `{tick, hp, hp_max, prayer, prayer_max, x, y, plane}`
+- Agent responds with actions: `{"type": "toggle_prayer", "prayer": "PROTECT_FROM_MELEE"}` or `{"type": "none"}`
+
+## Python Agent (`python/`)
+
+The Python package provides the agent server that connects to the RuneLite plugin.
+
+```bash
+cd python
+uv run agent-serve    # Start the agent WebSocket server
+```
+
+Requires Python >= 3.12. Uses `uv` for dependency management.
+
 ## Java Version
 
 Target is Java 11 (`options.release = 11` in gradle config).
