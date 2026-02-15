@@ -18,8 +18,12 @@ async def handler(websocket):
                 f"prayer={obs['prayer']}/{obs['prayer_max']}  "
                 f"pos=({obs['x']}, {obs['y']}, {obs['plane']})"
             )
-            # Return a no-op action
-            await websocket.send(json.dumps({"type": "none"}))
+            # Toggle protect from melee every 100 ticks
+            if obs["tick"] % 100 == 0:
+                print("  >>> Toggling Protect from Melee")
+                await websocket.send(json.dumps({"type": "toggle_prayer", "prayer": "PROTECT_FROM_MELEE"}))
+            else:
+                await websocket.send(json.dumps({"type": "none"}))
     except websockets.ConnectionClosed:
         print(f"[-] Client disconnected: {addr}")
 

@@ -2,7 +2,6 @@ package net.runelite.client.plugins.agentcontroller;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -17,10 +16,6 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
 
 @Slf4j
 @PluginDescriptor(
@@ -30,8 +25,6 @@ import okhttp3.WebSocketListener;
 )
 public class AgentControllerPlugin extends Plugin
 {
-	private static final String WS_URL = "ws://localhost:8765";
-
 	@Inject
 	private Client client;
 
@@ -44,9 +37,8 @@ public class AgentControllerPlugin extends Plugin
 	@Inject
 	private AgentControllerConfig config;
 
-	private WebSocket webSocket;
-	private volatile boolean connected;
-	private volatile String pendingAction;
+	private AgentWebSocket ws;
+	private ActionHandler actionHandler;
 
 	@Provides
 	AgentControllerConfig provideConfig(ConfigManager configManager)
@@ -57,57 +49,15 @@ public class AgentControllerPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		connect();
+		ws = new AgentWebSocket(okHttpClient);
+		actionHandler = new ActionHandler(client);
+		ws.connect();
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		disconnect();
-	}
-
-	private void connect()
-	{
-		if (webSocket != null)
-		{
-			return;
-		}
-
-		Request request = new Request.Builder()
-			.url(WS_URL)
-			.build();
-
-		webSocket = okHttpClient.newWebSocket(request, new WebSocketListener()
-		{
-			@Override
-			public void onOpen(WebSocket ws, Response response)
-			{
-				log.info("Agent WebSocket connected to {}", WS_URL);
-				connected = true;
-			}
-
-			@Override
-			public void onMessage(WebSocket ws, String text)
-			{
-				pendingAction = text;
-			}
-
-			@Override
-			public void onClosed(WebSocket ws, int code, String reason)
-			{
-				log.info("Agent WebSocket closed: {}/{}", code, reason);
-				connected = false;
-				webSocket = null;
-			}
-
-			@Override
-			public void onFailure(WebSocket ws, Throwable t, Response response)
-			{
-				log.warn("Agent WebSocket error", t);
-				connected = false;
-				webSocket = null;
-			}
-		});
+		ws.disconnect();
 	}
 
 	@Subscribe
@@ -118,9 +68,9 @@ public class AgentControllerPlugin extends Plugin
 			return;
 		}
 
-		if (!connected)
+		if (!ws.isConnected())
 		{
-			connect();
+			ws.connect();
 			return;
 		}
 
@@ -129,11 +79,10 @@ public class AgentControllerPlugin extends Plugin
 			return;
 		}
 
-		String action = pendingAction;
-		pendingAction = null;
+		String action = ws.poll();
 		if (action != null)
 		{
-			handleAction(action);
+			actionHandler.handle(action);
 		}
 
 		sendObservation();
@@ -142,7 +91,7 @@ public class AgentControllerPlugin extends Plugin
 	private void sendObservation()
 	{
 		Player local = client.getLocalPlayer();
-		if (local == null || webSocket == null)
+		if (local == null)
 		{
 			return;
 		}
@@ -159,39 +108,6 @@ public class AgentControllerPlugin extends Plugin
 		obs.addProperty("y", pos.getY());
 		obs.addProperty("plane", pos.getPlane());
 
-		String json = gson.toJson(obs);
-		webSocket.send(json);
-	}
-
-	private void handleAction(String actionJson)
-	{
-		try
-		{
-			JsonObject action = new JsonParser().parse(actionJson).getAsJsonObject();
-			String type = action.has("type") ? action.get("type").getAsString() : null;
-
-			if (type == null || type.equals("none"))
-			{
-				return;
-			}
-
-			log.info("Received action: {}", type);
-			// Action handling will be expanded here
-		}
-		catch (Exception e)
-		{
-			log.warn("Failed to parse action: {}", actionJson, e);
-		}
-	}
-
-	private void disconnect()
-	{
-		if (webSocket != null)
-		{
-			webSocket.close(1000, "Plugin shutting down");
-			webSocket = null;
-		}
-		connected = false;
-		pendingAction = null;
+		ws.send(gson.toJson(obs));
 	}
 }
