@@ -1,16 +1,14 @@
 package net.runelite.client.plugins.agentcontroller;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.Player;
-import net.runelite.api.Skill;
-import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.gameval.AnimationID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -39,6 +37,7 @@ public class AgentControllerPlugin extends Plugin
 
 	private AgentWebSocket ws;
 	private ActionHandler actionHandler;
+	private ObservationBuilder observationBuilder;
 
 	@Provides
 	AgentControllerConfig provideConfig(ConfigManager configManager)
@@ -51,6 +50,7 @@ public class AgentControllerPlugin extends Plugin
 	{
 		ws = new AgentWebSocket(okHttpClient);
 		actionHandler = new ActionHandler(client);
+		observationBuilder = new ObservationBuilder(client);
 		ws.connect();
 	}
 
@@ -58,6 +58,18 @@ public class AgentControllerPlugin extends Plugin
 	protected void shutDown()
 	{
 		ws.disconnect();
+		observationBuilder.reset();
+	}
+
+	@Subscribe
+	public void onAnimationChanged(AnimationChanged event)
+	{
+		if (observationBuilder.getVorkath() != null
+			&& event.getActor() == observationBuilder.getVorkath()
+			&& observationBuilder.getVorkath().getAnimation() == AnimationID.DS2_VORKATH_ATTACK_MELEE)
+		{
+			observationBuilder.onMeleeAttack();
+		}
 	}
 
 	@Subscribe
@@ -85,29 +97,6 @@ public class AgentControllerPlugin extends Plugin
 			actionHandler.handle(action);
 		}
 
-		sendObservation();
-	}
-
-	private void sendObservation()
-	{
-		Player local = client.getLocalPlayer();
-		if (local == null)
-		{
-			return;
-		}
-
-		WorldPoint pos = local.getWorldLocation();
-
-		JsonObject obs = new JsonObject();
-		obs.addProperty("tick", client.getTickCount());
-		obs.addProperty("hp", client.getBoostedSkillLevel(Skill.HITPOINTS));
-		obs.addProperty("hp_max", client.getRealSkillLevel(Skill.HITPOINTS));
-		obs.addProperty("prayer", client.getBoostedSkillLevel(Skill.PRAYER));
-		obs.addProperty("prayer_max", client.getRealSkillLevel(Skill.PRAYER));
-		obs.addProperty("x", pos.getX());
-		obs.addProperty("y", pos.getY());
-		obs.addProperty("plane", pos.getPlane());
-
-		ws.send(gson.toJson(obs));
+		ws.send(gson.toJson(observationBuilder.build()));
 	}
 }
