@@ -11,6 +11,7 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.gameval.AnimationID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.NPCManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import okhttp3.OkHttpClient;
@@ -35,6 +36,9 @@ public class AgentControllerPlugin extends Plugin
 	@Inject
 	private AgentControllerConfig config;
 
+	@Inject
+	private NPCManager npcManager;
+
 	private AgentWebSocket ws;
 	private ActionHandler actionHandler;
 	private ObservationBuilder observationBuilder;
@@ -50,7 +54,7 @@ public class AgentControllerPlugin extends Plugin
 	{
 		ws = new AgentWebSocket(okHttpClient);
 		actionHandler = new ActionHandler(client);
-		observationBuilder = new ObservationBuilder(client);
+		observationBuilder = new ObservationBuilder(client, npcManager);
 		ws.connect();
 	}
 

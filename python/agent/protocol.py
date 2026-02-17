@@ -9,7 +9,7 @@ class Observation:
     tick: int
     in_fight: bool
     vorkath_hp: int
-    vorkath_hp_scale: int
+    vorkath_hp_max: int
     attack: Optional[str]
     attack_ticks: int
     hp: int

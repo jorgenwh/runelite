@@ -7,19 +7,22 @@ import net.runelite.api.Projectile;
 import net.runelite.api.Skill;
 import net.runelite.api.gameval.NpcID;
 import net.runelite.api.gameval.SpotanimID;
+import net.runelite.client.game.NPCManager;
 
 class ObservationBuilder
 {
 	private static final int CYCLES_PER_TICK = 30;
 
 	private final Client client;
+	private final NPCManager npcManager;
 
 	private NPC vorkath;
 	private String meleeAttack;
 
-	ObservationBuilder(Client client)
+	ObservationBuilder(Client client, NPCManager npcManager)
 	{
 		this.client = client;
+		this.npcManager = npcManager;
 	}
 
 	void onMeleeAttack()
@@ -71,8 +74,28 @@ class ObservationBuilder
 		JsonObject obs = new JsonObject();
 		obs.addProperty("tick", client.getTickCount());
 		obs.addProperty("in_fight", inFight);
-		obs.addProperty("vorkath_hp", vorkath != null ? vorkath.getHealthRatio() : -1);
-		obs.addProperty("vorkath_hp_scale", vorkath != null ? vorkath.getHealthScale() : -1);
+		int vorkathHp = -1;
+		int vorkathHpMax = -1;
+		if (vorkath != null)
+		{
+			Integer maxHp = npcManager.getHealth(vorkath.getId());
+			if (maxHp != null)
+			{
+				vorkathHpMax = maxHp;
+				int ratio = vorkath.getHealthRatio();
+				int scale = vorkath.getHealthScale();
+				if (ratio > 0 && scale > 0)
+				{
+					vorkathHp = (int) ((maxHp * (long) ratio / scale) + 0.5f);
+				}
+				else if (ratio == 0)
+				{
+					vorkathHp = 0;
+				}
+			}
+		}
+		obs.addProperty("vorkath_hp", vorkathHp);
+		obs.addProperty("vorkath_hp_max", vorkathHpMax);
 		if (attack != null)
 		{
 			obs.addProperty("attack", attack);
